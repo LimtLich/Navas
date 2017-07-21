@@ -14,6 +14,8 @@ if (!process.env.NODE_ENV) {
     process.env.NODE_ENV = JSON.parse(config.dev.env.NODE_ENV);
 }
 
+const https = require('https');
+const fs = require('fs');
 const opn = require('opn');
 const path = require('path');
 const express = require('express');
@@ -21,8 +23,14 @@ const webpack = require('webpack');
 const proxyMiddleware = require('http-proxy-middleware');
 const webpackConfig = require('./webpack.dev.conf');
 
+const sslOptions = {
+    key: fs.readFileSync('./ssl/214102035480717.key'),
+    cert: fs.readFileSync('./ssl/214102035480717.pem'),
+}
+
 // 默认调试服务器端口
 let port = process.env.PORT || config.dev.port;
+let SSLPORT = 443
 
 // 启动调试服务器时是否自动打开浏览器，默认为 false
 let autoOpenBrowser = !!config.dev.autoOpenBrowser;
@@ -30,18 +38,23 @@ let autoOpenBrowser = !!config.dev.autoOpenBrowser;
 let app = express();
 let compiler = webpack(webpackConfig);
 
+let httpServer = https.createServer(sslOptions,app);
+httpServer.listen(SSLPORT, function() {
+    console.log('HTTPS Server is running on: https://localhost:%s', SSLPORT);
+})
+
 let devMiddleware = require('webpack-dev-middleware')(compiler, {
     publicPath: webpackConfig.output.publicPath,
     quiet: true
 });
 
 let hotMiddleware = require('webpack-hot-middleware')(compiler, {
-    log: function () {}
+    log: function() {}
 });
 
 // 当 html-webpack-plugin 的模版文件更新的时候，强制重新刷新调试页面
-compiler.plugin('compilation', function (compilation) {
-    compilation.plugin('html-webpack-plugin-after-emit', function (data, cb) {
+compiler.plugin('compilation', function(compilation) {
+    compilation.plugin('html-webpack-plugin-after-emit', function(data, cb) {
         hotMiddleware.publish({
             action: 'reload'
         });
@@ -53,7 +66,7 @@ compiler.plugin('compilation', function (compilation) {
 let proxyTable = config.dev.proxyTable;
 
 // 代理请求
-Object.keys(proxyTable).forEach(function (context) {
+Object.keys(proxyTable).forEach(function(context) {
     let options = proxyTable[context];
     if (typeof options === 'string') {
         options = {
@@ -79,13 +92,13 @@ app.use(staticPath, express.static('./static'));
 let uri = 'http://localhost:' + port;
 
 let newResolve;
-let readyPromise = new Promise(function (resolve) {
+let readyPromise = new Promise(function(resolve) {
     newResolve = resolve;
 });
 
 console.log('> Starting dev server...');
 
-devMiddleware.waitUntilValid(function () {
+devMiddleware.waitUntilValid(function() {
     console.log('> Listening at ' + uri + '\n');
 
     // 当测试环境下，不需要打开浏览器
@@ -99,7 +112,7 @@ let server = app.listen(port);
 
 module.exports = {
     ready: readyPromise,
-    close: function () {
+    close: function() {
         server.close();
     }
 };
